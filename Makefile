@@ -2,6 +2,9 @@
 # SPDX-FileCopyrightText: © 2022 Uri Shaked <uri@wokwi.com>
 
 ZIP_VERSION ?= unknown
+GIT_SHA =  $(shell git rev-parse HEAD)
+BUILD_TIME = $(shell date -u --rfc-2822)
+GO_FLAGS = -ldflags "-X 'main.gitHash=$(GIT_SHA)' -X 'main.buildTime=$(BUILD_TIME)' -X 'main.version=$(ZIP_VERSION)'"
 
 .PHONY: default
 default: build
@@ -11,11 +14,11 @@ run:
 
 .PHONY: build
 build:
-	GOOS=windows              go build -o bin/wokwigw.exe ./cmd/wokwigw
-	GOOS=darwin               go build -o bin/wokwigw-darwin ./cmd/wokwigw
-	GOOS=darwin  GOARCH=arm64 go build -o bin/wokwigw-darwin_arm64 ./cmd/wokwigw
-	GOOS=linux                go build -o bin/wokwigw-linux ./cmd/wokwigw
-	GOOS=linux   GOARCH=arm64 go build -o bin/wokwigw-linux_arm64 ./cmd/wokwigw
+	GOOS=windows              go build $(GO_FLAGS) -o bin/wokwigw.exe ./cmd/wokwigw
+	GOOS=darwin               go build $(GO_FLAGS) -o bin/wokwigw-darwin ./cmd/wokwigw
+	GOOS=darwin  GOARCH=arm64 go build $(GO_FLAGS) -o bin/wokwigw-darwin_arm64 ./cmd/wokwigw
+	GOOS=linux                go build $(GO_FLAGS) -o bin/wokwigw-linux ./cmd/wokwigw
+	GOOS=linux   GOARCH=arm64 go build $(GO_FLAGS) -o bin/wokwigw-linux_arm64 ./cmd/wokwigw
 
 .PHONY: zip
 zip: build

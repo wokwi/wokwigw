@@ -20,8 +20,13 @@ import (
 	"github.com/gobwas/ws/wsutil"
 )
 
+var (
+	version   = "unreleased"
+	gitHash   = ""
+	buildTime = ""
+)
+
 const (
-	version   = "0.0.1"
 	port      = 9011
 	gatewayIP = "10.13.37.1"
 
@@ -31,7 +36,18 @@ const (
 )
 
 func main() {
-	fmt.Printf("Wokwi Gateway version %s\n\n", version)
+	fmt.Println(`       __              ,`)
+	fmt.Println(`|  |  /  \  |_/  |  |  |`)
+	fmt.Println(`|/\|  \__/  | \  |/\|  |`)
+	fmt.Println()
+	fmt.Printf("Wokwi IoT Gateway\n")
+	fmt.Println()
+	fmt.Printf("Version: %s\n", version)
+	if gitHash != "" {
+		fmt.Printf("Git revision: %s\nBuilt: %s\n", gitHash, buildTime)
+	}
+
+	fmt.Println()
 	fmt.Printf("Listening on TCP port %d\n", port)
 
 	ctx, _ := context.WithCancel(context.Background())
