@@ -12,8 +12,13 @@ default: build
 run:
 	go run ./cmd/wokwigw
 
+cmd/wokwigw/rsrc_windows_amd64.syso: winres/winres.json winres/icon-32.png winres/icon-256.png
+	go install github.com/tc-hib/go-winres@v0.2.3
+	go run github.com/tc-hib/go-winres@v0.2.3 make --product-version git-tag --file-version git-tag
+	mv rsrc_windows_*.syso cmd/wokwigw
+
 .PHONY: build
-build:
+build: cmd/wokwigw/rsrc_windows_amd64.syso
 	GOOS=windows              go build $(GO_FLAGS) -o bin/wokwigw.exe ./cmd/wokwigw
 	GOOS=darwin               go build $(GO_FLAGS) -o bin/wokwigw-darwin ./cmd/wokwigw
 	GOOS=darwin  GOARCH=arm64 go build $(GO_FLAGS) -o bin/wokwigw-darwin_arm64 ./cmd/wokwigw
