@@ -91,7 +91,7 @@ func main() {
 		return
 	}
 
-	http.ListenAndServe(":9011", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	http.ListenAndServe("127.0.0.1:9011", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("Client connected: %s\n", r.RemoteAddr)
 
 		origin := r.Header.Get("Origin")
