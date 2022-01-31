@@ -50,8 +50,6 @@ func main() {
 	fmt.Println()
 	fmt.Printf("Listening on TCP port %d\n", port)
 
-	ctx, _ := context.WithCancel(context.Background())
-
 	config := types.Configuration{
 		Debug:             false,
 		CaptureFile:       "",
@@ -128,7 +126,10 @@ func main() {
 			return
 		}
 
+		ctx, cancel := context.WithCancel(context.TODO())
+
 		cleanup := func() {
+			cancel()
 			conn.Close()
 			pipe1.Close()
 			pipe2.Close()
