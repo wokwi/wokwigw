@@ -2,7 +2,7 @@
 
 > Connect your Wokwi simulated IoT Devices (e.g. ESP32) to you local network!
 
-This is still an early alpha version; Documentation will be available in the future.
+For installation and usage instructions, check out the [Wokwi ESP32 WiFi Guide](https://docs.wokwi.com/guides/esp32-wifi#the-private-gateway)
 
 ## Build
 
