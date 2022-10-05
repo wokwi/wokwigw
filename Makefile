@@ -18,12 +18,18 @@ cmd/wokwigw/rsrc_windows_amd64.syso: winres/winres.json winres/icon-32.png winre
 	mv rsrc_windows_*.syso cmd/wokwigw
 
 .PHONY: build
-build: cmd/wokwigw/rsrc_windows_amd64.syso
+build: lint cmd/wokwigw/rsrc_windows_amd64.syso
 	GOOS=windows              go build $(GO_FLAGS) -o bin/wokwigw.exe ./cmd/wokwigw
 	GOOS=darwin               go build $(GO_FLAGS) -o bin/wokwigw-darwin ./cmd/wokwigw
 	GOOS=darwin  GOARCH=arm64 go build $(GO_FLAGS) -o bin/wokwigw-darwin_arm64 ./cmd/wokwigw
 	GOOS=linux                go build $(GO_FLAGS) -o bin/wokwigw-linux ./cmd/wokwigw
 	GOOS=linux   GOARCH=arm64 go build $(GO_FLAGS) -o bin/wokwigw-linux_arm64 ./cmd/wokwigw
+
+
+.PHONY: lint
+lint:
+	# enable later
+	# golangci-lint run -v
 
 .PHONY: zip
 zip: build

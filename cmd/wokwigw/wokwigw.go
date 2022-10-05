@@ -8,90 +8,122 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net"
-	"net/http"
-
-	"github.com/wokwi/wokwigw/pkg/loopback"
-
 	"github.com/containers/gvisor-tap-vsock/pkg/types"
 	"github.com/containers/gvisor-tap-vsock/pkg/virtualnetwork"
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
+	"github.com/wokwi/wokwigw/pkg/loopback"
+	"io"
+	"net"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync"
+
+	"github.com/spf13/cobra"
 )
 
 var (
 	version   = "unreleased"
 	gitHash   = ""
 	buildTime = ""
+
+	config = defaultConfig()
 )
 
-const (
-	port      = 9011
-	gatewayIP = "10.13.37.1"
+var flags = flagCfg{
+	listenPort:  defaultListenPort,
+	forwardList: []string{},
+}
 
-	/* Forwarding */
-	forwardPort   = 9080
-	forwardTarget = "10.13.37.2:80"
-)
+func execute() error {
+	return newRootCmd(&flags, &config).Execute()
+}
 
-func main() {
-	fmt.Println(`       __              ,`)
-	fmt.Println(`|  |  /  \  |_/  |  |  |`)
-	fmt.Println(`|/\|  \__/  | \  |/\|  |`)
-	fmt.Println()
-	fmt.Printf("Wokwi IoT Gateway\n")
-	fmt.Println()
-	fmt.Printf("Version: %s\n", version)
+func newRootCmd(flags *flagCfg, config *types.Configuration) *cobra.Command {
+
+	rootCmd := &cobra.Command{
+		Use:   "wokwigw",
+		Short: fmt.Sprintf("wokwi IoT Gateway (ver:%s)", version),
+		Long: fmt.Sprintf(`
+wokwi IoT Gateway (ver:%s)
+
+	Connect your Wokwi simulated IoT Devices (e.g. ESP32) to you local network!
+`, version),
+		RunE: run,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// You can bind cobra and viper in a few locations, but PersistencePreRunE on the root command works well
+			return validateAndMapFlags(flags, config)
+		},
+	}
+
+	// configure flags
+	f := rootCmd.PersistentFlags()
+
+	f.StringSliceVar(&flags.forwardList, "forward", flags.forwardList, "specify one or more forwarding localPort:address:remotePort tuples")
+	f.IntVar(&flags.listenPort, "listenPort", flags.listenPort, "listening port (on local host)")
+
+	return rootCmd
+}
+
+func validateAndMapFlags(flags *flagCfg, cfg *types.Configuration) (err error) {
+
+	// map command line arguments to configuration structure (forwardList)
+	// note: since we're using syntax similar to ssh -L option, we do the splitting ourselves here
+	for _, fwd := range flags.forwardList {
+		parts := strings.Split(fwd, ":")
+		if len(parts) != 3 {
+			return fmt.Errorf(string("arg %s is not formatted using the syntax 'localPort:addr:remotePort'"), fwd)
+		}
+
+		if v, e := strconv.Atoi(parts[0]); err != nil || v < 0 || v > 65535 {
+			return fmt.Errorf("invalid local port specified in forward argument (%s): %w", fwd, e)
+		}
+
+		if v, e := strconv.Atoi(parts[2]); err != nil || v < 0 || v > 65535 {
+			return fmt.Errorf("invalid remote port specified in forward argument (%s): %w", fwd, e)
+		}
+
+		cfg.Forwards[":"+parts[0]] = net.JoinHostPort(parts[1], parts[2])
+	}
+
+	if flags.listenPort < 0 || flags.listenPort > 65535 {
+		return fmt.Errorf("invalid listen port specified (%d)", flags.listenPort)
+	}
+
+	return nil
+}
+
+func banner() {
+
+	var gitStr string
+
 	if gitHash != "" {
-		fmt.Printf("Git revision: %s\nBuilt: %s\n", gitHash, buildTime)
+		gitStr = fmt.Sprintf("Git revision: %s\nBuilt: %s\n\n", gitHash, buildTime)
 	}
 
-	fmt.Println()
-	fmt.Printf("Listening on TCP port %d\n", port)
+	fmt.Printf(`
+       __              ,
+|  |  /  \  |_/  |  |  |
+|/\|  \__/  | \  |/\|  |
 
-	config := types.Configuration{
-		Debug:             false,
-		CaptureFile:       "",
-		MTU:               1500,
-		Subnet:            "10.13.37.0/24",
-		GatewayIP:         gatewayIP,
-		GatewayMacAddress: "42:13:37:55:aa:01",
-		DHCPStaticLeases: map[string]string{
-			"10.13.37.2": "24:0a:c4:00:01:10",
-		},
-		DNS: []types.Zone{
-			{
-				Name: "wokwi.internal.",
-				Records: []types.Record{
-					{
-						Name: "gateway",
-						IP:   net.ParseIP(gatewayIP),
-					},
-					{
-						Name: "host",
-						IP:   net.ParseIP("10.13.37.254"),
-					},
-				},
-			},
-		},
-		Forwards: map[string]string{
-			fmt.Sprintf(":%d", forwardPort): forwardTarget,
-		},
-		NAT: map[string]string{
-			"10.13.37.254": "127.0.0.1",
-		},
-		GatewayVirtualIPs: []string{"10.13.37.254"},
-		Protocol:          types.QemuProtocol,
-	}
+    Wokwi IoT Gateway
+
+Version: %s
+%s
+Listening on TCP Port %d
+`, version, gitStr, flags.listenPort)
+}
+
+func run(cmd *cobra.Command, _ []string) error {
+	banner()
 
 	vn, err := virtualnetwork.New(&config)
 	if err != nil {
-		fmt.Printf("Error creating network: %v\n", err)
-		return
+		return fmt.Errorf("Error creating network %w", err)
 	}
 
-	http.ListenAndServe("127.0.0.1:9011", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	err = http.ListenAndServe(net.JoinHostPort(defaultListenAddr, strconv.Itoa(flags.listenPort)), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("Client connected: %s\n", r.RemoteAddr)
 
 		origin := r.Header.Get("Origin")
@@ -126,15 +158,22 @@ func main() {
 			return
 		}
 
-		ctx, cancel := context.WithCancel(context.TODO())
+		// need a wait group to wait for the below goroutines before exiting this function
+		wg := sync.WaitGroup{}
+		ctx, cancel := context.WithCancel(cmd.Context())
 
+		wg.Add(2)
 		cleanup := func() {
 			cancel()
-			conn.Close()
-			pipe1.Close()
-			pipe2.Close()
+
+			// todo: need to handle errors here
+			_ = conn.Close()
+			_ = pipe1.Close()
+			_ = pipe2.Close()
+			wg.Done()
 		}
 
+		// todo: this function returns error - handle or wrap
 		go vn.AcceptQemu(ctx, pipe1)
 
 		go func() {
@@ -183,5 +222,11 @@ func main() {
 				}
 			}
 		}()
+
+		// wait for grs to be done
+		wg.Wait()
+
 	}))
+
+	return err
 }
