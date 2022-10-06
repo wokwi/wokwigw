@@ -122,7 +122,7 @@ func run(cmd *cobra.Command, _ []string) error {
 
 	vn, err := virtualnetwork.New(&config)
 	if err != nil {
-		return fmt.Errorf("Error creating network %w", err)
+		return fmt.Errorf("error creating network %w", err)
 	}
 
 	err = http.ListenAndServe(net.JoinHostPort(defaultListenAddr, strconv.Itoa(flags.listenPort)), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
