@@ -8,17 +8,18 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/containers/gvisor-tap-vsock/pkg/types"
-	"github.com/containers/gvisor-tap-vsock/pkg/virtualnetwork"
-	"github.com/gobwas/ws"
-	"github.com/gobwas/ws/wsutil"
-	"github.com/wokwi/wokwigw/pkg/loopback"
 	"io"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/containers/gvisor-tap-vsock/pkg/types"
+	"github.com/containers/gvisor-tap-vsock/pkg/virtualnetwork"
+	"github.com/gobwas/ws"
+	"github.com/gobwas/ws/wsutil"
+	"github.com/wokwi/wokwigw/pkg/loopback"
 
 	"github.com/spf13/cobra"
 )
@@ -37,6 +38,7 @@ var flags = flagCfg{
 }
 
 func execute() error {
+	cobra.MousetrapHelpText = ""
 	return newRootCmd(&flags, &config).Execute()
 }
 
