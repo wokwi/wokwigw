@@ -19,6 +19,7 @@ import (
 	"github.com/containers/gvisor-tap-vsock/pkg/virtualnetwork"
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
+	"github.com/sirupsen/logrus"
 	"github.com/wokwi/wokwigw/pkg/loopback"
 
 	"github.com/spf13/cobra"
@@ -120,15 +121,17 @@ Listening on TCP Port %d
 func run(cmd *cobra.Command, _ []string) error {
 	banner()
 
+	logrus.SetLevel(logrus.WarnLevel)
+
 	vn, err := virtualnetwork.New(&config)
 	if err != nil {
 		return fmt.Errorf("error creating network %w", err)
 	}
 
 	err = http.ListenAndServe(net.JoinHostPort(defaultListenAddr, strconv.Itoa(flags.listenPort)), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("Client connected: %s\n", r.RemoteAddr)
-
 		origin := r.Header.Get("Origin")
+		fmt.Printf("[%s] Client connected (%s)\n", r.RemoteAddr, origin)
+
 		if !checkOrigin(origin) {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Printf("[%s] Invalid origin: %s\n", r.RemoteAddr, origin)
