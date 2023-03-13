@@ -65,6 +65,7 @@ wokwi IoT Gateway (ver:%s)
 
 	f.StringSliceVar(&flags.forwardList, "forward", flags.forwardList, "specify one or more forwarding localPort:address:remotePort tuples")
 	f.IntVar(&flags.listenPort, "listenPort", flags.listenPort, "listening port (on local host)")
+	f.StringVar(&flags.captureFile, "captureFile", flags.captureFile, "packet capture (PCAP) file name (for debugging)")
 
 	return rootCmd
 }
@@ -93,6 +94,8 @@ func validateAndMapFlags(flags *flagCfg, cfg *types.Configuration) (err error) {
 	if flags.listenPort < 0 || flags.listenPort > 65535 {
 		return fmt.Errorf("invalid listen port specified (%d)", flags.listenPort)
 	}
+
+	cfg.CaptureFile = flags.captureFile
 
 	return nil
 }

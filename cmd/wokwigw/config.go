@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/containers/gvisor-tap-vsock/pkg/types"
 	"net"
+
+	"github.com/containers/gvisor-tap-vsock/pkg/types"
 )
 
 const (
@@ -22,6 +23,7 @@ const (
 type flagCfg struct {
 	forwardList []string
 	listenPort  int
+	captureFile string
 }
 
 func defaultConfig() types.Configuration {
