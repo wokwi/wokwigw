@@ -22,9 +22,8 @@ build: lint cmd/wokwigw/rsrc_windows_amd64.syso
 	GOOS=windows              go build $(GO_FLAGS) -o bin/wokwigw.exe ./cmd/wokwigw
 	GOOS=darwin               go build $(GO_FLAGS) -o bin/wokwigw-darwin ./cmd/wokwigw
 	GOOS=darwin  GOARCH=arm64 go build $(GO_FLAGS) -o bin/wokwigw-darwin_arm64 ./cmd/wokwigw
-	GOOS=linux                go build $(GO_FLAGS) -o bin/wokwigw-linux ./cmd/wokwigw
-	GOOS=linux   GOARCH=arm64 go build $(GO_FLAGS) -o bin/wokwigw-linux_arm64 ./cmd/wokwigw
-
+	GOOS=linux                CGO_ENABLED=0 go build $(GO_FLAGS) -o bin/wokwigw-linux ./cmd/wokwigw
+	GOOS=linux   GOARCH=arm64 CGO_ENABLED=0 go build $(GO_FLAGS) -o bin/wokwigw-linux_arm64 ./cmd/wokwigw
 
 .PHONY: lint
 lint:
