@@ -63,8 +63,8 @@ wokwi IoT Gateway (ver:%s)
 	// configure flags
 	f := rootCmd.PersistentFlags()
 
-	f.StringSliceVar(&flags.forwardList, "forward", flags.forwardList, "specify one or more forwarding localPort:address:remotePort tuples")
-	f.IntVar(&flags.listenPort, "listenPort", flags.listenPort, "listening port (on local host)")
+	f.StringSliceVar(&flags.forwardList, "forward", flags.forwardList, "forward port to the simulator. Format: [udp:]localPort:remoteAddress:remotePort tuples")
+	f.IntVar(&flags.listenPort, "listenPort", flags.listenPort, "listening port (on localhost)")
 	f.StringVar(&flags.captureFile, "captureFile", flags.captureFile, "packet capture (PCAP) file name (for debugging)")
 
 	return rootCmd
@@ -76,8 +76,13 @@ func validateAndMapFlags(flags *flagCfg, cfg *types.Configuration) (err error) {
 	// note: since we're using syntax similar to ssh -L option, we do the splitting ourselves here
 	for _, fwd := range flags.forwardList {
 		parts := strings.Split(fwd, ":")
+		prefix := ""
+		if len(parts) == 4 && parts[0] == "udp" {
+			prefix = "udp:"
+			parts = parts[1:]
+		}
 		if len(parts) != 3 {
-			return fmt.Errorf(string("arg %s is not formatted using the syntax 'localPort:addr:remotePort'"), fwd)
+			return fmt.Errorf(string("arg ``%s`` is not formatted using the syntax '[udp:]localPort:addr:remotePort'"), fwd)
 		}
 
 		if v, e := strconv.Atoi(parts[0]); err != nil || v < 0 || v > 65535 {
@@ -88,7 +93,7 @@ func validateAndMapFlags(flags *flagCfg, cfg *types.Configuration) (err error) {
 			return fmt.Errorf("invalid remote port specified in forward argument (%s): %w", fwd, e)
 		}
 
-		cfg.Forwards[":"+parts[0]] = net.JoinHostPort(parts[1], parts[2])
+		cfg.Forwards[prefix+":"+parts[0]] = net.JoinHostPort(parts[1], parts[2])
 	}
 
 	if flags.listenPort < 0 || flags.listenPort > 65535 {

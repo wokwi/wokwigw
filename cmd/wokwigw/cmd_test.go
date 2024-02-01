@@ -2,10 +2,11 @@ package main
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/containers/gvisor-tap-vsock/pkg/types"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestFlags(t *testing.T) {
@@ -59,6 +60,7 @@ func TestRootCmd(t *testing.T) {
 	}{
 		"1 valid fwd, no listen port":                 {[]string{"--forward", "1234:host:4567"}, 1, 0, false, ""},
 		"2 valid fwd, no listen port":                 {[]string{"--forward", "1234:host:4567", "--forward", "1111:host:2222"}, 2, 0, false, ""},
+		"1 valid fwd with udp":                        {[]string{"--forward", "udp:1234:host:4567"}, 1, 0, false, ""},
 		"1 invalid fwd (local port), no listen port":  {[]string{"--forward", "99999:host:4567"}, 0, 0, true, "invalid local port specified in forward argument"},
 		"2 invalid fwd (local port), no listen port":  {[]string{"--forward", "1234:host:1234", "--forward", "99999:host:4567"}, 0, 0, true, "invalid local port specified in forward argument"},
 		"1 invalid fwd (remote port), no listen port": {[]string{"--forward", "1234:host:99999"}, 0, 9011, true, "invalid remote port specified in forward argument"},
