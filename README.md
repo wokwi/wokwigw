@@ -27,7 +27,7 @@ wokwigw --forward 8080:10.13.37.2:80
 To forward a UDP port, add the `udp:` prefix. For instance, the following command will forward UDP port 8888 on your local machine to UDP port 1234 on the simulated device:
 
 ```bash
-wokwigw --forward udp:8888:10.37.37.2:1234
+wokwigw --forward udp:8888:10.13.37.2:1234
 ```
 
 You can repeat the `--forward` flag multiple times to forward multiple ports.
