@@ -126,8 +126,20 @@ Listening on TCP Port %d
 `, version, gitStr, flags.listenPort)
 }
 
+func printForwards(config *types.Configuration) {
+	// Print forwards
+	if len(config.Forwards) > 0 {
+		fmt.Println("\nPort forwards (local -> simulator):")
+		for local, remote := range config.Forwards {
+			fmt.Printf("  %s -> %s\n", local, remote)
+		}
+		fmt.Println()
+	}
+}
+
 func run(cmd *cobra.Command, _ []string) error {
 	banner()
+	printForwards(&config)
 
 	logrus.SetLevel(logrus.WarnLevel)
 
