@@ -30,6 +30,7 @@ func (w *WaterBackend) Setup(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error creating TAP interface: %w", err)
 	}
+	fmt.Println("Created a TAP interface with name:", ifce.Name())
 	w.ifce = ifce
 	return nil
 }
