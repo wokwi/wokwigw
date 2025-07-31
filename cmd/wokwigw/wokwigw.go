@@ -4,23 +4,17 @@
 package main
 
 import (
-	"context"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/containers/gvisor-tap-vsock/pkg/types"
-	"github.com/containers/gvisor-tap-vsock/pkg/virtualnetwork"
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
 	"github.com/sirupsen/logrus"
-	"github.com/wokwi/wokwigw/pkg/loopback"
 
 	"github.com/spf13/cobra"
 )
@@ -66,11 +60,17 @@ wokwi IoT Gateway (ver:%s)
 	f.StringSliceVar(&flags.forwardList, "forward", flags.forwardList, "forward port to the simulator. Format: [udp:]localPort:remoteAddress:remotePort tuples")
 	f.IntVar(&flags.listenPort, "listenPort", flags.listenPort, "listening port (on localhost)")
 	f.StringVar(&flags.captureFile, "captureFile", flags.captureFile, "packet capture (PCAP) file name (for debugging)")
+	f.BoolVar(&flags.bridge, "bridge", flags.bridge, "use bridge mode (experimental, see docs)")
 
 	return rootCmd
 }
 
 func validateAndMapFlags(flags *flagCfg, cfg *types.Configuration) (err error) {
+
+	// Check if bridge mode is incompatible with forwards
+	if flags.bridge && len(flags.forwardList) > 0 {
+		return fmt.Errorf("bridge mode does not support port forwarding. remove the --forward flag")
+	}
 
 	// map command line arguments to configuration structure (forwardList)
 	// note: since we're using syntax similar to ssh -L option, we do the splitting ourselves here
@@ -85,11 +85,11 @@ func validateAndMapFlags(flags *flagCfg, cfg *types.Configuration) (err error) {
 			return fmt.Errorf(string("arg ``%s`` is not formatted using the syntax '[udp:]localPort:addr:remotePort'"), fwd)
 		}
 
-		if v, e := strconv.Atoi(parts[0]); err != nil || v < 0 || v > 65535 {
+		if v, e := strconv.Atoi(parts[0]); e != nil || v < 0 || v > 65535 {
 			return fmt.Errorf("invalid local port specified in forward argument (%s): %w", fwd, e)
 		}
 
-		if v, e := strconv.Atoi(parts[2]); err != nil || v < 0 || v > 65535 {
+		if v, e := strconv.Atoi(parts[2]); e != nil || v < 0 || v > 65535 {
 			return fmt.Errorf("invalid remote port specified in forward argument (%s): %w", fwd, e)
 		}
 
@@ -113,6 +113,10 @@ func banner() {
 		gitStr = fmt.Sprintf("Git revision: %s\nBuilt: %s\n\n", gitHash, buildTime)
 	}
 
+	mode := "vsock"
+	if flags.bridge {
+		mode = "bridge"
+	}
 	fmt.Printf(`
        __              ,
 |  |  /  \  |_/  |  |  |
@@ -122,8 +126,8 @@ func banner() {
 
 Version: %s
 %s
-Listening on TCP Port %d
-`, version, gitStr, flags.listenPort)
+Listening on TCP Port %d (mode: %s)
+`, version, gitStr, flags.listenPort, mode)
 }
 
 func printForwards(config *types.Configuration) {
@@ -138,17 +142,27 @@ func printForwards(config *types.Configuration) {
 }
 
 func run(cmd *cobra.Command, _ []string) error {
-	banner()
-	printForwards(&config)
-
 	logrus.SetLevel(logrus.WarnLevel)
 
-	vn, err := virtualnetwork.New(&config)
-	if err != nil {
-		return fmt.Errorf("error creating network %w", err)
+	banner()
+
+	// Create the appropriate backend based on the bridge flag
+	var backend Backend
+	if flags.bridge {
+		backend = NewWaterBackend()
+	} else {
+		printForwards(&config)
+		backend = NewVsockBackend(&config)
 	}
 
-	err = http.ListenAndServe(net.JoinHostPort(defaultListenAddr, strconv.Itoa(flags.listenPort)), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// Setup the backend
+	ctx := cmd.Context()
+	if err := backend.Setup(ctx); err != nil {
+		return fmt.Errorf("error setting up backend: %w", err)
+	}
+	defer backend.Cleanup()
+
+	err := http.ListenAndServe(net.JoinHostPort(defaultListenAddr, strconv.Itoa(flags.listenPort)), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 		fmt.Printf("[%s] Client connected (%s)\n", r.RemoteAddr, origin)
 
@@ -161,12 +175,6 @@ func run(cmd *cobra.Command, _ []string) error {
 		conn, _, _, err := ws.UpgradeHTTP(r, w)
 		if err != nil {
 			fmt.Printf("[%s] Web socket error: %s\n", r.RemoteAddr, err)
-			return
-		}
-
-		pipe1, pipe2, err := loopback.ConnLoopback()
-		if err != nil {
-			fmt.Printf("[%s] Pipe creation failed: %s\n", r.RemoteAddr, err)
 			return
 		}
 
@@ -183,74 +191,10 @@ func run(cmd *cobra.Command, _ []string) error {
 			return
 		}
 
-		// need a wait group to wait for the below goroutines before exiting this function
-		wg := sync.WaitGroup{}
-		ctx, cancel := context.WithCancel(cmd.Context())
-
-		wg.Add(2)
-		cleanup := func() {
-			cancel()
-
-			// todo: need to handle errors here
-			_ = conn.Close()
-			_ = pipe1.Close()
-			_ = pipe2.Close()
-			wg.Done()
+		// Handle the connection using the appropriate backend
+		if err := backend.HandleConnection(ctx, conn, r.RemoteAddr); err != nil {
+			fmt.Printf("[%s] Connection handling error: %s\n", r.RemoteAddr, err)
 		}
-
-		// todo: this function returns error - handle or wrap
-		go vn.AcceptQemu(ctx, pipe1)
-
-		go func() {
-			defer cleanup()
-
-			for {
-				msg, op, err := wsutil.ReadClientData(conn)
-				if err != nil {
-					return
-				}
-				if op == ws.OpBinary {
-					err := binary.Write(pipe2, binary.BigEndian, uint32(len(msg)))
-					if err != nil {
-						return
-					}
-
-					_, err = pipe2.Write(msg)
-					if err != nil {
-						return
-					}
-				} else if op == ws.OpText {
-					fmt.Printf("[%s] Incoming message: %v\n", r.RemoteAddr, msg)
-				}
-			}
-		}()
-
-		go func() {
-			defer cleanup()
-
-			for {
-				var size uint32
-				err := binary.Read(pipe2, binary.BigEndian, &size)
-				if err != nil {
-					return
-				}
-
-				buf := make([]byte, size)
-				_, err = io.ReadFull(pipe2, buf[0:])
-				if err != nil {
-					return
-				}
-
-				err = wsutil.WriteServerBinary(conn, buf)
-				if err != nil {
-					return
-				}
-			}
-		}()
-
-		// wait for grs to be done
-		wg.Wait()
-
 	}))
 
 	return err

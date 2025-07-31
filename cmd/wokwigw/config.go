@@ -24,6 +24,7 @@ type flagCfg struct {
 	forwardList []string
 	listenPort  int
 	captureFile string
+	bridge      bool
 }
 
 func defaultConfig() types.Configuration {

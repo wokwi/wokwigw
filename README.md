@@ -36,6 +36,38 @@ You can repeat the `--forward` flag multiple times to forward multiple ports.
 
 To connect from the simulation to your local machine (that is the machine running wokwigw), use the host `host.wokwi.internal`. For example, if you are running an HTTP server on port 1234 on your computer, you can connect to it from within the simulator using the URL http://host.wokwi.internal:1234/.
 
+### Bridge mode
+
+The bridge mode is an advanced feature that allows you to connect your simulated device to your local network. The simulated device will get an IP address on your local network, and you can connect to it using the IP address.
+
+The bridge mode works on Linux (root required) and Windows (A driver is required, see below).
+
+Port forwarding is not supported in bridge mode, since the simulated device is now connected to your local network and you can directly connect to it using the IP address.
+
+#### Linux setup
+
+1. Run `wokwigw --bridge`
+2. This will create a virtual bridge interface on your machine. Run the following commands as root to configure the bridge interface:
+
+```bash
+sudo ip link add br0 type bridge
+sudo ip link set eth0 master br0
+sudo ip link set dev tap0 up
+sudo ip link set tap0 master br0
+sudo ip link set dev br0 up
+```
+
+Replace `eth0` with the name of your local network interface. WiFi interfaces may not work in bridge mode (if you find otherwise, please let us know!).
+
+#### Windows setup
+
+1. Install the [windows TAP driver](https://build.openvpn.net/downloads/releases/tap-windows-9.24.2-I601-Win10.exe)
+2. Run `wokwigw --bridge`
+3. Go to the "Network & Internet" settings in the Windows Settings app, and select "More network adapter options".
+4. Find a "Local Area Connection" interface named "TAP-Windows Adapter V9". Shift-click on it to select it.
+5. Find your local network interface (e.g. "Ethernet" or "Wi-Fi") and shift-click on it to select it.
+6. Right click, and select "Bridge connections" from the context menu.
+
 ## Building
 
 ```
