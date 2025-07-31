@@ -7,6 +7,7 @@ toolchain go1.24.5
 require (
 	github.com/containers/gvisor-tap-vsock v0.8.3
 	github.com/gobwas/ws v1.3.0
+	github.com/google/gopacket v1.1.19
 	github.com/sirupsen/logrus v1.9.3
 	github.com/songgao/packets v0.0.0-20160404182456-549a10cd4091
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
@@ -21,7 +22,6 @@ require (
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/google/btree v1.1.2 // indirect
-	github.com/google/gopacket v1.1.19 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/insomniacslk/dhcp v0.0.0-20240710054256-ddd8a41251c9 // indirect
 	github.com/miekg/dns v1.1.63 // indirect
