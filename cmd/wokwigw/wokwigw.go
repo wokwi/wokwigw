@@ -149,7 +149,7 @@ func run(cmd *cobra.Command, _ []string) error {
 	// Create the appropriate backend based on the bridge flag
 	var backend Backend
 	if flags.bridge {
-		backend = NewWaterBackend()
+		backend = NewWaterBackend(&config)
 	} else {
 		printForwards(&config)
 		backend = NewVsockBackend(&config)

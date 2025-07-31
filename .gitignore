@@ -1,3 +1,5 @@
 .vscode/launch.json
 bin
 cmd/wokwigw/*.syso
+*.pcap
+
